@@ -1,0 +1,197 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  WAITER
+  KITCHEN
+}
+
+enum TabStatus {
+  OPEN
+  CLOSED
+}
+
+enum OrderStatus {
+  RECEIVED
+  PREPARING
+  READY
+  DELIVERED
+}
+
+model Company {
+  id         String      @id @default(cuid())
+  name       String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  users      User[]
+  tables     Table[]
+  seats      Seat[]
+  tabs       Tab[]
+  menus      Menu[]
+  categories Category[]
+  products   Product[]
+  orders     Order[]
+  orderItems OrderItem[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+model Table {
+  id          String   @id @default(cuid())
+  companyId   String
+  number      Int
+  name        String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  seats       Seat[]
+  tabs        Tab[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+}
+
+model Seat {
+  id        String   @id @default(cuid())
+  companyId String
+  tableId   String
+  number    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  table   Table   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tabs    Tab[]
+
+  @@unique([tableId, number])
+  @@index([companyId])
+}
+
+model Tab {
+  id           String    @id @default(cuid())
+  companyId    String
+  tableId      String
+  seatId       String
+  customerName String
+  customerCpf  String
+  status       TabStatus @default(OPEN)
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  table   Table   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  seat    Seat    @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  orders  Order[]
+
+  @@index([companyId])
+  @@index([tableId, seatId, status])
+}
+
+model Menu {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  categories Category[]
+
+  @@index([companyId])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  companyId String
+  menuId    String
+  name      String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  menu     Menu      @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@index([companyId])
+  @@index([menuId])
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  companyId       String
+  categoryId      String
+  name            String
+  description     String
+  price           Decimal  @db.Decimal(10, 2)
+  image           String?
+  preparationTime Int
+  isAvailable     Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category   Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@index([companyId])
+  @@index([categoryId])
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  companyId   String
+  tabId       String
+  status      OrderStatus @default(RECEIVED)
+  notes       String?
+  totalAmount Decimal     @db.Decimal(10, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  company Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tab     Tab         @relation(fields: [tabId], references: [id], onDelete: Cascade)
+  items   OrderItem[]
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  companyId String
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  notes     String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([orderId])
+}
